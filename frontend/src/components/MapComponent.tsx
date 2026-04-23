@@ -1,219 +1,143 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline } from "react-leaflet";
-import { BrainCircuit, Route, ShieldCheck } from "lucide-react";
+import { MapContainer, TileLayer, Popup, Circle, Marker } from "react-leaflet";
+import { Droplet, Cpu, AlertCircle, Info } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 
 // Fix Leaflet icons issue in React (Next.js bundler bug)
 import L from "leaflet";
 
-const defaultIcon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+const JUNIN_COORDS: [number, number] = [-12.06, -75.21]; // Huancayo/Junín area centered
 
-L.Marker.prototype.options.icon = defaultIcon;
-
-
-const JUNIN_COORDS: [number, number] = [-11.1586, -75.9926];
-
-const ZONE_COORDS: Record<string, [number, number]> = {
-  "Sector Norte": [-11.0, -75.9],
-  "Sector Sur": [-11.4, -76.1],
-  "Centro Histórico": [-11.15, -75.99],
-  "Jauja Centro": [-11.77, -75.5],
-  "El Tambo": [-12.06, -75.21]
-};
+const ZONES = [
+  { name: "El Tambo", coords: [-12.043, -75.216], val: "450 m³/h", status: "ok", color: "#10b981" },
+  { name: "Huancayo Centro", coords: [-12.067, -75.210], val: "380 m³/h", status: "ok", color: "#0ea5e9" },
+  { name: "Chilca", coords: [-12.083, -75.205], val: "520 m³/h", status: "danger", color: "#ef4444" },
+  { name: "Pilcomayo", coords: [-12.060, -75.235], val: "290 m³/h", status: "warning", color: "#f59e0b" },
+  { name: "Huancán", coords: [-12.115, -75.195], val: "210 m³/h", status: "ok", color: "#6366f1" },
+];
 
 export default function MapComponent() {
-  const [riskZones, setRiskZones] = useState<any[]>([]);
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [route, setRoute] = useState<[number, number][]>([]);
-  const [logisticsInfo, setLogisticsInfo] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Cargar datos iniciales
-    const loadData = async () => {
-      try {
-        const [alertsRes, riskRes] = await Promise.all([
-          fetch("http://127.0.0.1:8000/api/v1/alerts"),
-          fetch("http://127.0.0.1:8000/api/v1/ai/risk-zones")
-        ]);
-        
-        if (!alertsRes.ok || !riskRes.ok) throw new Error("Failed to fetch data");
-
-        const alertData = await alertsRes.json();
-        const zones = await riskRes.json();
-        
-        if (Array.isArray(zones)) {
-          setRiskZones(zones);
-        } else {
-          console.warn("risk-zones API did not return an array", zones);
-          setRiskZones([]);
-        }
-
-        if (Array.isArray(alertData)) {
-          setAlerts(alertData.filter((a: any) => a.severity === 'HIGH'));
-        }
-      } catch (err) {
-        console.error("Failed to load map data", err);
-      }
-    };
-
-    loadData();
+    setMounted(true);
   }, []);
 
-  const handleOptimizeRoute = async () => {
-    setLoading(true);
-    // Filtrar solo alertas activas con coordenadas simuladas (para el demo)
-    const locations = alerts.map((a, i) => ({
-      id: a.id,
-      lat: JUNIN_COORDS[0] + (Math.random() - 0.5) * 0.5,
-      lon: JUNIN_COORDS[1] + (Math.random() - 0.5) * 0.5
-    }));
-
-    try {
-      const response = await fetch("http://127.0.0.1:8000/api/v1/logistics/optimize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ locations })
-      });
-      if (!response.ok) throw new Error("Optimization failed");
-      const data = await response.json();
-      if (data.route_points) {
-        setRoute(data.route_points as [number, number][]);
-        setLogisticsInfo(data);
-      }
-    } catch (err) {
-      console.error("Error optimizando ruta", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!mounted) return null;
 
   return (
     <div className="h-full w-full relative z-0">
       <MapContainer 
         center={JUNIN_COORDS} 
-        zoom={10} 
-        style={{ height: "100%", width: "100%", zIndex: 1 }}
+        zoom={13} 
+        style={{ height: "100%", width: "100%", zIndex: 1, background: '#060b16' }}
+        zoomControl={false}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
+          url="https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
         />
         
-        {/* Represa Principal (Punto Operativo) */}
-        <Marker position={[-11.15, -75.99]}>
-          <Popup>
-            <div className="font-sans">
-              <strong className="text-blue-600 block mb-1">Represa Central Junín</strong>
-              <span className="text-xs text-gray-500">Caudal estable.</span>
-            </div>
-          </Popup>
-        </Marker>
-
-        {/* Zona de Alerta (Círculo Rojo) */}
-        <Circle 
-          center={[-11.45, -75.5]} 
-          pathOptions={{ color: 'red', fillColor: '#ef4444' }} 
-          radius={5000}
-        >
-          <Popup>
-            <div className="font-sans">
-              <strong className="text-red-500 block mb-1">ALERTA ALRT-901-X</strong>
-              <span className="text-xs text-gray-500">Fuga detectada / Válvula Jauja</span>
-            </div>
-          </Popup>
-        </Circle>
-
-        {/* Sensor secundario */}
-        <Marker position={[-11.0, -76.2]}>
-          <Popup>
-            <div className="font-sans">
-              <strong className="text-green-600 block mb-1">Sensor TR-001</strong>
-              <span className="text-xs text-gray-500">Operativo</span>
-            </div>
-          </Popup>
-        </Marker>
-
-        {/* Phase 2: Risk Zones (XGBoost) */}
-        {Array.isArray(riskZones) && riskZones.map((z, idx) => {
-          const coords = ZONE_COORDS[z.zone] || [-11.2, -76.0];
-          const color = z.risk_score === 'HIGH' ? '#ef4444' : z.risk_score === 'MEDIUM' ? '#f97316' : '#22c55e';
-          return (
-            <Circle 
-              key={`risk-${idx}`}
-              center={coords}
-              radius={8000}
-              pathOptions={{ color: color, fillColor: color, fillOpacity: 0.1, weight: 1, dashArray: '5, 5' }}
-            >
-              <Popup>
-                <div className="font-sans">
-                  <strong style={{ color }}>Riesgo {z.risk_score}: {z.zone}</strong>
-                  <p className="text-xs text-gray-500 mt-1">Análisis por XGBoost</p>
+        {ZONES.map((zone) => (
+          <Circle 
+            key={zone.name}
+            center={zone.coords as [number, number]}
+            radius={600}
+            pathOptions={{ 
+              color: zone.color, 
+              fillColor: zone.color, 
+              fillOpacity: 0.15, 
+              weight: 2,
+              dashArray: zone.status === 'danger' ? '5, 5' : '1'
+            }}
+          >
+            <Popup className="water-popup">
+              <div className="p-3 min-w-[160px] bg-[#0d1425] text-white rounded-xl border border-white/10 shadow-2xl">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">{zone.name}</span>
+                  <div className={`w-2 h-2 rounded-full`} style={{ backgroundColor: zone.color }}></div>
                 </div>
-              </Popup>
-            </Circle>
-          );
-        })}
+                <div className="flex items-baseline space-x-2">
+                  <span className="text-xl font-black">{zone.val.split(' ')[0]}</span>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">m³/h</span>
+                </div>
+                <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
+                   <span className="text-[9px] font-bold text-gray-500 uppercase">Estado</span>
+                   <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border border-current opacity-80`} style={{ color: zone.color }}>
+                      {zone.status === 'danger' ? 'Crítico' : zone.status === 'warning' ? 'Alerta' : 'Estable'}
+                   </span>
+                </div>
+              </div>
+            </Popup>
+          </Circle>
+        ))}
 
-        {/* Phase 2: Optimized Route (OR-Tools) */}
-        {route.length > 0 && (
-          <Polyline 
-            positions={route} 
-            pathOptions={{ color: '#6366f1', weight: 4, opacity: 0.7, dashArray: '10, 10' }} 
-          />
-        )}
+        {/* Custom Point Markers for Sensors */}
+        <SensorMarker coords={[-12.05, -75.22]} id="IOT-SN-01" val="45 PSI" />
+        <SensorMarker coords={[-12.075, -75.215]} id="IOT-SN-02" val="42 PSI" />
+        <SensorMarker coords={[-12.09, -75.20]} id="IOT-SN-03" val="12 PSI" status="alert" />
+
       </MapContainer>
 
-      {/* Control Panel Over Map */}
-      <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-        <div className="bg-[#0f172a]/90 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-2xl min-w-[200px]">
-          <h4 className="text-sm font-bold text-gray-200 border-b border-white/5 pb-2 mb-3 flex items-center gap-2">
-            <BrainCircuit className="w-4 h-4 text-indigo-400" />
-            Logística IA (Phase 2)
-          </h4>
-          
-          <div className="space-y-3">
-            <button 
-              onClick={handleOptimizeRoute}
-              disabled={loading || alerts.length === 0}
-              className="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2"
-            >
-              <Route className={`w-4 h-4 ${loading ? 'animate-pulse' : ''}`} />
-              {loading ? 'Optimizando...' : 'Optimizar Ruta Crítica'}
-            </button>
-            <p className="text-[10px] text-gray-500 italic text-center">
-              {alerts.length} alertas críticas activas.
-            </p>
-          </div>
+      {/* Professional Overlay Styling */}
+      <style jsx global>{`
+        .leaflet-container {
+          background-color: #060b16 !important;
+        }
+        .water-popup .leaflet-popup-content-wrapper {
+          background: transparent !important;
+          padding: 0 !important;
+          box-shadow: none !important;
+        }
+        .water-popup .leaflet-popup-tip {
+          background: #0d1425 !important;
+          border: 1px solid rgba(255,255,255,0.1);
+        }
+        .water-popup .leaflet-popup-content {
+          margin: 0 !important;
+        }
+      `}</style>
+    </div>
+  );
+}
 
-          {logisticsInfo && (
-            <div className="mt-4 pt-4 border-t border-white/10 space-y-2 animate-in fade-in duration-500">
-              <div className="flex justify-between text-[11px]">
-                <span className="text-gray-400">Distancia Total:</span>
-                <span className="text-indigo-400 font-mono font-bold">{logisticsInfo.distance_km} km</span>
-              </div>
-              <div className="flex justify-between text-[11px]">
-                <span className="text-gray-400">Tiempo Est.:</span>
-                <span className="text-indigo-400 font-mono font-bold">{logisticsInfo.estimated_time_mins} min</span>
-              </div>
-              <div className="mt-2 flex items-center gap-1.5 px-2 py-1 bg-green-500/10 border border-green-500/20 rounded-md">
-                <ShieldCheck className="w-3 h-3 text-green-400" />
-                <span className="text-[9px] text-green-400 font-bold uppercase tracking-widest">Ruta Verificada</span>
-              </div>
+function SensorMarker({ coords, id, val, status = 'ok' }: any) {
+  const color = status === 'alert' ? '#ef4444' : '#10b981';
+  
+  const icon = L.divIcon({
+    className: 'custom-sensor-icon',
+    html: `
+      <div class="relative flex items-center justify-center">
+        <div class="absolute w-6 h-6 rounded-full bg-${status === 'alert' ? 'red' : 'emerald'}-500/20 animate-ping opacity-60"></div>
+        <div class="relative w-3 h-3 rounded-full border-2 border-white shadow-lg" style="background-color: ${color}"></div>
+      </div>
+    `,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+  });
+
+  return (
+    <Marker position={coords} icon={icon}>
+      <Popup className="water-popup">
+        <div className="p-3 bg-[#0d1425] text-white rounded-xl border border-white/10 shadow-2xl space-y-2">
+          <div className="flex items-center space-x-2">
+            <Cpu className="w-3 h-3 text-primary" />
+            <span className="text-[10px] font-black uppercase tracking-widest">{id}</span>
+          </div>
+          <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg">
+             <span className="text-[10px] font-bold text-gray-500">Presión actual</span>
+             <span className={`text-xs font-black ${status === 'alert' ? 'text-red-400' : 'text-emerald-400'}`}>{val}</span>
+          </div>
+          {status === 'alert' && (
+            <div className="flex items-center space-x-1.5 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded-md">
+               <AlertCircle className="w-3 h-3 text-red-500" />
+               <span className="text-[9px] font-bold text-red-500 uppercase">Fuga Detectada</span>
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </Popup>
+    </Marker>
   );
 }

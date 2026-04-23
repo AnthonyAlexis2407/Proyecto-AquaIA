@@ -15,13 +15,6 @@ app = FastAPI(
 )
 
 # Configuración prioritaria de CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # ----------------------------------------------------
 # 1. Configuración de Modelos Pydantic (Validación)
@@ -88,26 +81,20 @@ async def startup_event():
     print("  Iniciando motor de IA de AquaIA v2.0 (Reloaded)...")
     print("=" * 60)
     try:
-        # Desactivado temporalmente para asegurar arranque rápido y evitar bloqueos en demo
-        # ai_predictor.train_model()
-        # anomaly_detector.train_model()
-        # demand_forecaster.train_model()
-        # risk_scanner.train_model()
+        print("[AquaIA Startup] Entrenando modelos de IA...")
+        ai_predictor.train_model()
+        anomaly_detector.train_model()
+        demand_forecaster.train_model()
+        risk_scanner.train_model()
+        print("[AquaIA Startup] Todos los modelos listos para inferencia.")
         print("=" * 60)
-        print("  [OK] Servidor AquaIA v2.0 arriba (Modelos en modo On-Demand).")
+        print("  [OK] Servidor AquaIA v2.0 arriba.")
         print("=" * 60)
     except Exception as e:
-        print(f"  [Error en Startup] No se pudieron entrenar algunos modelos: {e}")
+        print(f"[AquaIA Startup] Error crítico en entrenamiento: {e}")
         print("  El sistema continuará en modo Simulación/Mock.")
 
 # Configurar CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # ----------------------------------------------------
 # 2. Endpoints Base

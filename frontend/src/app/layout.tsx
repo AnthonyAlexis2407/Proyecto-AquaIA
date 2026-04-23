@@ -1,78 +1,203 @@
-import type { Metadata } from "next";
+"use client";
+
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Droplet, LayoutDashboard, Map as MapIcon, BrainCircuit, ShieldAlert, Settings } from "lucide-react";
+import { 
+  Droplet, LayoutDashboard, Map as MapIcon, BrainCircuit, 
+  ShieldAlert, Settings, Activity, Cpu, FileText, 
+  BarChart3, Zap, Bell, LogOut
+} from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const inter = Inter({ subsets: ["latin"] });
-
-export const metadata: Metadata = {
-  title: "AquaIA | Plataforma Inteligente",
-  description: "Plataforma Inteligente para la Optimización Logística y Monitoreo del Sistema Hídrico en la Región Junín.",
-};
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [isAuth, setIsAuth] = useState<boolean>(false);
+  const [loading, setLoading] = useState(true);
+
+  const isLoginPage = pathname === "/login";
+
+  useEffect(() => {
+    // Simulación de persistencia de sesión "Premium"
+    const session = localStorage.getItem("aquaia_session");
+    if (session) {
+      setIsAuth(true);
+    } else if (!isLoginPage) {
+      router.push("/login");
+    }
+    setLoading(false);
+  }, [isLoginPage, router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("aquaia_session");
+    setIsAuth(false);
+    router.push("/login");
+  };
+
+  // Pantalla de carga profesional
+  if (loading) {
+    return (
+      <html lang="es" className="dark h-full">
+        <body className={`${inter.className} h-full bg-[#060b16] flex items-center justify-center`}>
+           <div className="flex flex-col items-center space-y-4">
+              <Droplet className="w-12 h-12 text-primary animate-bounce" />
+              <div className="w-48 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                 <div className="h-full bg-primary animate-[loading_2s_ease-in-out_infinite]"></div>
+              </div>
+           </div>
+        </body>
+      </html>
+    );
+  }
+
+  // Layout para la página de Login (Sin Sidebar/Header)
+  if (isLoginPage) {
+    return (
+      <html lang="es" className="dark h-full antialiased">
+        <body className={`${inter.className} min-h-screen bg-[#060b16] text-[#f8fafc]`}>
+          {children}
+        </body>
+      </html>
+    );
+  }
+
   return (
     <html lang="es" className="dark h-full antialiased">
-      <body className={`${inter.className} min-h-screen bg-[var(--color-background)] text-[var(--color-foreground)] flex`}>
-        {/* Sidebar */}
-        <aside className="w-64 bg-[var(--color-card)] border-r border-[var(--color-border)] flex flex-col z-20">
-          <div className="h-16 flex items-center px-6 border-b border-[var(--color-border)]">
-            <Droplet className="w-6 h-6 text-primary mr-2" />
-            <h1 className="text-xl font-bold tracking-wider">AquaIA</h1>
+      <body className={`${inter.className} h-screen bg-[var(--color-background)] text-[var(--color-foreground)] flex overflow-hidden`}>
+        {/* Sidebar - Fijo a la izquierda */}
+        <aside className="w-72 bg-[#0d1425] border-r border-white/5 flex flex-col z-20 shadow-2xl flex-shrink-0">
+          <div className="h-20 flex items-center px-8 border-b border-white/5">
+            <div className="bg-primary/20 p-2 rounded-xl mr-3">
+              <Droplet className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-white">AquaIA</h1>
+              <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-medium leading-none mt-1">Gestión Hídrica</p>
+            </div>
           </div>
           
-          <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-            <Link href="/" className="flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-[var(--color-primary)]/10 hover:text-[var(--color-primary)] transition-colors">
-              <LayoutDashboard className="w-5 h-5" />
-              <span>Resumen Global</span>
-            </Link>
-            <Link href="/map" className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-white/5 transition-colors">
-              <MapIcon className="w-5 h-5" />
-              <span>Red Hídrica (Junín)</span>
-            </Link>
-            <Link href="/ai" className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-white/5 transition-colors">
-              <BrainCircuit className="w-5 h-5" />
-              <span>Predicciones IA</span>
-            </Link>
-            <Link href="/alerts" className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-white/5 transition-colors">
-              <ShieldAlert className="w-5 h-5" />
-              <span>Alertas Activas</span>
-            </Link>
+          <nav className="flex-1 px-4 py-8 space-y-8 overflow-y-auto custom-scrollbar">
+            {/* Categoría: PRINCIPAL */}
+            <div>
+              <p className="px-4 text-[10px] font-bold text-gray-500 uppercase tracking-[0.15em] mb-4">Principal</p>
+              <div className="space-y-1">
+                <NavItem href="/" icon={<LayoutDashboard size={18} />} label="Dashboard" active={pathname === "/"} />
+                <NavItem href="/monitoreo" icon={<Activity size={18} />} label="Monitoreo" active={pathname === "/monitoreo"} />
+                <NavItem href="/alerts" icon={<Bell size={18} />} label="Alertas" active={pathname === "/alerts"} badge="3" />
+              </div>
+            </div>
+
+            {/* Categoría: ANÁLISIS */}
+            <div>
+              <p className="px-4 text-[10px] font-bold text-gray-500 uppercase tracking-[0.15em] mb-4">Análisis</p>
+              <div className="space-y-1">
+                <NavItem href="/ai" icon={<BrainCircuit size={18} />} label="Predicción IA" active={pathname === "/ai"} />
+                <NavItem href="/optimization" icon={<Zap size={18} />} label="Optimización" active={pathname === "/optimization"} />
+                <NavItem href="/map" icon={<MapIcon size={18} />} label="Mapa Hídrico" active={pathname === "/map"} />
+              </div>
+            </div>
+
+            {/* Categoría: SISTEMA */}
+            <div>
+              <p className="px-4 text-[10px] font-bold text-gray-500 uppercase tracking-[0.15em] mb-4">Sistema</p>
+              <div className="space-y-1">
+                <NavItem href="/sensors" icon={<Cpu size={18} />} label="Sensores IoT" active={pathname === "/sensors"} />
+                <NavItem href="/reports" icon={<FileText size={18} />} label="Reportes" active={pathname === "/reports"} />
+                <NavItem href="/settings" icon={<Settings size={18} />} label="Configuración" active={pathname === "/settings"} />
+              </div>
+            </div>
           </nav>
           
-          <div className="px-4 py-4 border-t border-[var(--color-border)]">
-            <button className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-white/5 transition-colors">
-              <Settings className="w-5 h-5" />
-              <span>Configuración</span>
-            </button>
+          <div className="p-4 border-t border-white/5">
+            <div className="bg-white/5 rounded-xl p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-accent flex items-center justify-center text-white font-bold shadow-lg">
+                JD
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-white truncate">Juan Delgado</p>
+                <p className="text-xs text-gray-500 truncate">Administrador</p>
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 group transition-colors"
+                title="Cerrar Sesión"
+              >
+                <LogOut className="w-4 h-4 group-hover:text-red-500" />
+              </button>
+            </div>
           </div>
         </aside>
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-          {/* Header */}
-          <header className="h-16 bg-[var(--color-card)]/50 backdrop-blur-sm border-b border-[var(--color-border)] flex items-center justify-between px-8 z-10 sticky top-0">
-            <div className="flex items-center">
-              <span className="text-sm font-medium text-gray-400">Región Junín / Status</span>
+        {/* Main Content Area - Scrollable */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+          {/* Top Header - Fijo arriba del contenido */}
+          <header className="h-20 bg-[var(--color-background)]/80 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-10 z-10 flex-shrink-0">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Región Junín / Central</span>
+              <h2 className="text-sm font-semibold text-white mt-1">Panel de Control General</h2>
             </div>
-            <div className="flex items-center space-x-4">
-               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-               <span className="text-sm font-medium text-green-400">Sistema Conectado</span>
+            <div className="flex items-center space-x-6">
+                <div className="flex items-center space-x-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                  <span className="text-[11px] font-bold text-green-400 uppercase tracking-wider">Sistema Conectado</span>
+                </div>
+                <button className="relative p-2 text-gray-400 hover:text-white transition-colors">
+                  <Bell size={20} />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#060b16]"></span>
+                </button>
             </div>
           </header>
           
-          {/* Page Content */}
-          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[var(--color-background)] p-8 animate-in fade-in duration-500">
+          {/* Page Content - UNICO ELEMENTO CON SCROLL */}
+          <main className="flex-1 overflow-x-hidden overflow-y-auto p-10 bg-[#060b16] custom-scrollbar">
             {children}
           </main>
         </div>
+
+        <style jsx global>{`
+          @keyframes loading {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+          }
+        `}</style>
       </body>
     </html>
   );
 }
 
+function NavItem({ href, icon, label, active, badge }: { href: string; icon: React.ReactNode; label: string; active?: boolean; badge?: string }) {
+  return (
+    <Link 
+      href={href} 
+      className={`
+        flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 group
+        ${active 
+          ? "bg-primary text-white shadow-lg shadow-primary/20" 
+          : "text-gray-400 hover:bg-white/5 hover:text-white"}
+      `}
+    >
+      <div className="flex items-center space-x-3">
+        <span className={`${active ? "text-white" : "group-hover:text-primary transition-colors"}`}>
+          {icon}
+        </span>
+        <span className="text-sm font-medium">{label}</span>
+      </div>
+      {badge && (
+        <span className={`
+          text-[10px] font-bold px-1.5 py-0.5 rounded-md
+          ${active ? "bg-white/20 text-white" : "bg-red-500 text-white"}
+        `}>
+          {badge}
+        </span>
+      )}
+    </Link>
+  );
+}

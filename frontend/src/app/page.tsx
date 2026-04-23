@@ -1,104 +1,87 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Activity, Droplets, AlertTriangle, Zap, BrainCircuit, ShieldAlert, RefreshCw } from "lucide-react";
-import {
-  ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-  Scatter, ScatterChart, Cell, ReferenceLine, AreaChart
-} from "recharts";
-import Link from "next/link";
+import { 
+  TrendingUp, Activity, ShieldAlert, Cpu, 
+  ArrowUpRight, ArrowDownRight, Droplet, 
+  Clock, MoreVertical, Search
+} from "lucide-react";
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, 
+  Tooltip, ResponsiveContainer, BarChart, Bar 
+} from 'recharts';
 
-interface Metrics {
-  status: string;
-  active_sensors: number;
-  total_sensors: number;
-  flow_rate_m3s: number;
-  anomalies_detected: number;
-  ai_prediction: string;
+interface Metric {
+  label: string;
+  value: string | number;
+  trend: string;
+  isUp: boolean;
+  icon: React.ReactNode;
+  color: string;
 }
-
-interface FlowData {
-  time: string;
-  real_flow: number;
-  predicted_flow: number;
-  is_anomaly: boolean;
-  temperature: number;
-  rain_prob: number;
-}
-
-interface ForecastPoint {
-  ds: string;
-  yhat: number;
-}
-
-const statusConfig: Record<string, { color: string; bg: string; pulse: boolean }> = {
-  "OPERATIVO": { color: "text-green-400", bg: "bg-green-500/10", pulse: false },
-  "ALERTA": { color: "text-orange-400", bg: "bg-orange-500/10", pulse: true },
-  "CRÍTICO": { color: "text-red-400", bg: "bg-red-500/10", pulse: true },
-};
-
-// Tooltip personalizado para el gráfico
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null;
-  const data = payload[0]?.payload;
-  return (
-    <div className="bg-[#0d1526] border border-[#1e293b] rounded-xl p-4 shadow-2xl min-w-[220px]">
-      <p className="text-gray-400 text-xs font-mono mb-2">{label}</p>
-      <div className="space-y-1.5">
-        <div className="flex justify-between text-sm">
-          <span className="text-sky-400">Caudal Real</span>
-          <span className="font-bold text-sky-300">{data?.real_flow} m³/s</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-violet-400">Predicción IA</span>
-          <span className="font-bold text-violet-300">{data?.predicted_flow} m³/s</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-400">Temperatura</span>
-          <span className="text-gray-200">{data?.temperature}°C</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-400">Lluvia</span>
-          <span className="text-gray-200">{data?.rain_prob}%</span>
-        </div>
-        {data?.is_anomaly && (
-          <div className="mt-2 pt-2 border-t border-red-500/30">
-            <span className="text-red-400 text-xs font-bold animate-pulse">⚠ ANOMALÍA DETECTADA — Isolation Forest</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 export default function Dashboard() {
-  const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [flowData, setFlowData] = useState<FlowData[]>([]);
-  const [forecastData, setForecastData] = useState<ForecastPoint[]>([]);
+  const [metrics, setMetrics] = useState<Metric[]>([]);
+  const [flowData, setFlowData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState<string>("");
+  const [error, setError] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const [metricsRes, flowRes, forecastRes] = await Promise.all([
-        fetch("http://127.0.0.1:8000/api/v1/dashboard/metrics"),
-        fetch("http://127.0.0.1:8000/api/v1/dashboard/flow-chart"),
-        fetch("http://127.0.0.1:8000/api/v1/ai/forecast")
+      const metricsRes = await fetch("http://127.0.0.1:8000/api/v1/dashboard/metrics");
+      const flowRes = await fetch("http://127.0.0.1:8000/api/v1/dashboard/flow-chart");
+      
+      if (!metricsRes.ok || !flowRes.ok) throw new Error("API Error");
+
+      const metricsData = await metricsRes.json();
+      const chartData = await flowRes.json();
+
+      setMetrics([
+        { 
+          label: "Caudal Actual", 
+          value: `${metricsData.current_flow} m³/s`, 
+          trend: "+2.4%", 
+          isUp: true, 
+          icon: <Activity size={20} />, 
+          color: "text-primary" 
+        },
+        { 
+          label: "Eficiencia Ener.", 
+          value: "94.2%", 
+          trend: "+1.2%", 
+          isUp: true, 
+          icon: <Droplet size={20} />, 
+          color: "text-emerald-400" 
+        },
+        { 
+          label: "Anomalías (24h)", 
+          value: metricsData.anomalies_detected, 
+          trend: "-12%", 
+          isUp: false, 
+          icon: <ShieldAlert size={20} />, 
+          color: "text-red-400" 
+        },
+        { 
+          label: "Nodos Activos", 
+          value: metricsData.active_sensors, 
+          trend: "Stable", 
+          isUp: true, 
+          icon: <Cpu size={20} />, 
+          color: "text-sky-400" 
+        },
       ]);
-      
-      if (metricsRes.ok) setMetrics(await metricsRes.json());
-      if (flowRes.ok) {
-        const flowData = await flowRes.json();
-        if (Array.isArray(flowData)) setFlowData(flowData);
-      }
-      if (forecastRes.ok) {
-        const forecastData = await forecastRes.json();
-        if (Array.isArray(forecastData)) setForecastData(forecastData);
-      }
-      
-      setLastUpdate(new Date().toLocaleTimeString("es-PE"));
+      setFlowData(chartData);
+      setError(false);
     } catch (err) {
       console.error("Failed to fetch dashboard data", err);
+      setError(true);
+      // Fallback a datos mock si falla el fetch
+      setMetrics([
+        { label: "Caudal Actual", value: "38.5 m³/s", trend: "+2.4%", isUp: true, icon: <Activity size={20} />, color: "text-primary" },
+        { label: "Eficiencia Ener.", value: "94.2%", trend: "+1.2%", isUp: true, icon: <Droplet size={20} />, color: "text-emerald-400" },
+        { label: "Anomalías (24h)", value: "3", trend: "-12%", isUp: false, icon: <ShieldAlert size={20} />, color: "text-red-400" },
+        { label: "Nodos Activos", value: "128", trend: "Estable", isUp: true, icon: <Cpu size={20} />, color: "text-sky-400" },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -106,324 +89,178 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 15000);
+    const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  const anomalyCount = flowData.filter(d => d.is_anomaly).length;
-  const currentStatus = statusConfig[metrics?.status || "OPERATIVO"] || statusConfig["OPERATIVO"];
-
-  if (loading && !metrics) {
-    return (
-      <div className="flex h-full items-center justify-center flex-col space-y-4">
-        <div className="relative">
-          <div className="animate-spin rounded-full h-16 w-16 border-2 border-primary/20 border-t-primary"></div>
-          <Droplets className="w-6 h-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-        </div>
-        <p className="text-gray-400 text-sm animate-pulse">Conectando con modelos de IA...</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Resumen Operativo</h2>
-          <p className="text-gray-400 mt-1">Monitoreo en tiempo real con detección de anomalías (Isolation Forest).</p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <span className="text-xs text-gray-500 font-mono">{lastUpdate && `Actualizado: ${lastUpdate}`}</span>
-          <button onClick={fetchData} className="p-2 hover:bg-white/5 rounded-lg transition-colors" title="Refrescar datos">
-            <RefreshCw className="w-4 h-4 text-gray-400" />
-          </button>
-        </div>
-      </div>
-
-      {/* Metrics Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Card 1: Estado General */}
-        <div className={`bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl p-6 shadow-sm transition-all duration-500 ${currentStatus.pulse ? 'border-orange-500/30' : ''}`}>
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm font-medium text-gray-400">Estado General</p>
-              <h3 className={`text-2xl font-bold mt-1 ${currentStatus.color} ${currentStatus.pulse ? 'animate-pulse' : ''}`}>
-                {metrics?.status || "DESCONOCIDO"}
-              </h3>
-            </div>
-            <div className={`p-3 rounded-lg ${currentStatus.bg}`}>
-              <Activity className={`w-5 h-5 ${currentStatus.color}`} />
-            </div>
+    <div className="space-y-8 animate-in">
+      {/* Dashboard Top Header Section */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-1">
+          <h2 className="text-3xl font-black text-white tracking-tight">Panel de Operaciones <span className="text-gray-600">—</span> General</h2>
+          <div className="flex items-center space-x-2">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+            </span>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">Monitoreo en Vivo · Junín, Perú</p>
           </div>
         </div>
-
-        {/* Card 2: Caudal Promedio */}
-        <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl p-6 shadow-sm">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm font-medium text-gray-400">Caudal Promedio</p>
-              <h3 className="text-2xl font-bold mt-1 text-primary">{metrics?.flow_rate_m3s || 0} <span className="text-sm text-gray-500">m³/s</span></h3>
-            </div>
-            <div className="p-3 bg-primary/10 rounded-lg">
-              <Droplets className="w-5 h-5 text-primary" />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Sensores Activos */}
-        <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl p-6 shadow-sm">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm font-medium text-gray-400">Sensores Activos</p>
-              <h3 className="text-2xl font-bold mt-1">{metrics?.active_sensors || 0} <span className="text-sm text-gray-500">/ {metrics?.total_sensors || 0}</span></h3>
-            </div>
-            <div className="p-3 bg-blue-500/10 rounded-lg">
-              <Zap className="w-5 h-5 text-blue-500" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="w-full bg-gray-800 rounded-full h-1.5">
-              <div
-                className="bg-blue-500 h-1.5 rounded-full transition-all duration-700"
-                style={{ width: `${((metrics?.active_sensors || 0) / (metrics?.total_sensors || 1)) * 100}%` }}
+        
+        <div className="flex items-center bg-white/5 p-1.5 rounded-2xl border border-white/10">
+           <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-600 group-focus-within:text-primary" />
+              <input 
+                type="text" 
+                placeholder="Buscar reporte..." 
+                className="bg-transparent border-none text-[10px] font-bold text-gray-400 placeholder:text-gray-700 focus:ring-0 pl-9 pr-6 uppercase tracking-widest"
               />
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: Anomalías (Isolation Forest) */}
-        <div className={`bg-[var(--color-card)] border rounded-xl p-6 shadow-sm transition-all duration-500 ${
-          (metrics?.anomalies_detected ?? 0) > 5 
-            ? 'border-red-500/40 shadow-red-500/10 shadow-lg' 
-            : (metrics?.anomalies_detected ?? 0) > 0 
-              ? 'border-orange-500/30' 
-              : 'border-[var(--color-border)]'
-        }`}>
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm font-medium text-gray-400">Anomalías (IF)</p>
-              <h3 className={`text-2xl font-bold mt-1 ${
-                (metrics?.anomalies_detected ?? 0) > 5 ? 'text-red-400' :
-                (metrics?.anomalies_detected ?? 0) > 0 ? 'text-orange-400' : 'text-gray-100'
-              }`}>
-                {metrics?.anomalies_detected || 0}
-              </h3>
-              <p className="text-xs text-gray-500 mt-1">Isolation Forest</p>
-            </div>
-            <div className={`p-3 rounded-lg ${
-              (metrics?.anomalies_detected ?? 0) > 5 ? 'bg-red-500/10' :
-              (metrics?.anomalies_detected ?? 0) > 0 ? 'bg-orange-500/10' : 'bg-gray-500/10'
-            }`}>
-              <AlertTriangle className={`w-5 h-5 ${
-                (metrics?.anomalies_detected ?? 0) > 5 ? 'text-red-500' :
-                (metrics?.anomalies_detected ?? 0) > 0 ? 'text-orange-500' : 'text-gray-500'
-              }`} />
-            </div>
-          </div>
+           </div>
+           <button className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Exportar</button>
         </div>
       </div>
 
-      {/* Main Chart Area & AI Box */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      {/* Primary Metrics Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {metrics.map((metric, i) => (
+          <MetricCard key={i} {...metric} />
+        ))}
+      </div>
 
-        {/* Flow Chart con Anomalías */}
-        <div className="lg:col-span-2 bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl p-6 shadow-sm">
-          <div className="mb-4 flex justify-between items-start">
+      <div className="grid gap-8 lg:grid-cols-12">
+        {/* Main Chart Container */}
+        <div className="lg:col-span-8 glass-card rounded-[2.5rem] p-8 flex flex-col min-h-[450px] border-white/5 overflow-hidden">
+          <div className="flex justify-between items-center mb-8">
             <div>
-              <h3 className="text-lg font-semibold">Caudal del Río Mantaro — Últimas 24h</h3>
-              <p className="text-sm text-gray-400">Comparativa: Caudal real vs Predicción IA · Puntos rojos = Anomalías detectadas por Isolation Forest</p>
+               <h3 className="text-xl font-bold text-white tracking-tight">Consumo Hidro-Logístico</h3>
+               <p className="text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Estimación IA vs Caudal Real</p>
             </div>
-            {anomalyCount > 0 && (
-              <span className="flex items-center space-x-1.5 text-xs px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-full text-red-400 font-medium animate-pulse">
-                <ShieldAlert className="w-3 h-3" />
-                <span>{anomalyCount} anomalía{anomalyCount > 1 ? 's' : ''}</span>
-              </span>
+            <div className="flex bg-white/5 p-1 rounded-xl">
+               <button className="px-3 py-1.5 text-[10px] font-black uppercase text-white bg-white/5 rounded-lg border border-white/10 shadow-lg">24h</button>
+               <button className="px-3 py-1.5 text-[10px] font-black uppercase text-gray-500 hover:text-gray-300">7d</button>
+            </div>
+          </div>
+
+          <div className="flex-1 w-full min-h-[300px]">
+            {loading ? (
+              <div className="h-full w-full flex items-center justify-center bg-white/[0.02] rounded-3xl animate-pulse">
+                <p className="text-[10px] font-black text-gray-600 uppercase tracking-[0.3em]">Cargando dataset dinámico...</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <AreaChart data={flowData}>
+                  <defs>
+                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                  <XAxis 
+                    dataKey="time" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: '#4b5563', fontSize: 10, fontWeight: 700}} 
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: '#4b5563', fontSize: 10, fontWeight: 700}} 
+                  />
+                  <Tooltip 
+                    contentStyle={{borderRadius: '1.5rem', border: '1px solid rgba(255,255,255,0.1)', background: '#0d1425', padding: '12px'}}
+                    itemStyle={{fontSize: '12px', fontWeight: 'bold'}}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="value" 
+                    stroke="#10b981" 
+                    strokeWidth={4} 
+                    fillOpacity={1} 
+                    fill="url(#colorValue)" 
+                    animationDuration={2000}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             )}
           </div>
-          
-          <div className="h-[380px] w-full mt-4 min-h-[300px]">
-            {flowData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={flowData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorReal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorAI" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="time" stroke="#475569" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#475569" fontSize={11} tickLine={false} axisLine={false} domain={['dataMin - 5', 'dataMax + 5']} />
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend 
-                  verticalAlign="top" 
-                  height={36}
-                  wrapperStyle={{ color: '#e2e8f0', fontSize: '12px', paddingBottom: '8px' }}
-                />
-                <Area type="monotone" dataKey="real_flow" name="Caudal Real" stroke="#0ea5e9" strokeWidth={2.5} fillOpacity={1} fill="url(#colorReal)" />
-                <Area type="monotone" dataKey="predicted_flow" name="Predicción IA" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="5 5" fillOpacity={1} fill="url(#colorAI)" />
-                
-                {/* Scatter para anomalías — puntos rojos grandes */}
-                <Scatter
-                  name="Anomalía (IF)"
-                  dataKey="real_flow"
-                  fill="#ef4444"
-                  shape={(props: any) => {
-                    const { cx, cy, payload } = props;
-                    if (!payload?.is_anomaly) return null;
-                    return (
-                      <g>
-                        <circle cx={cx} cy={cy} r={8} fill="rgba(239, 68, 68, 0.2)" stroke="#ef4444" strokeWidth={2} />
-                        <circle cx={cx} cy={cy} r={4} fill="#ef4444" />
-                        <circle cx={cx} cy={cy} r={12} fill="none" stroke="rgba(239, 68, 68, 0.3)" strokeWidth={1}>
-                          <animate attributeName="r" from="8" to="18" dur="1.5s" repeatCount="indefinite" />
-                          <animate attributeName="opacity" from="0.6" to="0" dur="1.5s" repeatCount="indefinite" />
-                        </circle>
-                      </g>
-                    );
-                  }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-              Cargando datos de flujo...
-            </div>
-          )}
-        </div>
         </div>
 
-        {/* AI Insight Box */}
-        <div className="lg:col-span-1 bg-gradient-to-br from-indigo-900/40 to-[var(--color-card)] border border-indigo-500/30 rounded-xl p-6 shadow-sm flex flex-col">
-          <div className="flex items-center space-x-2 mb-4">
-            <BrainCircuit className="w-6 h-6 text-indigo-400" />
-            <h3 className="text-lg font-semibold text-indigo-100">Motor de IA</h3>
-          </div>
-          
-          <div className="flex-1 space-y-4">
-            {/* Estado de los modelos */}
-            <div className="p-3 bg-black/20 rounded-lg border border-white/5">
-              <p className="text-xs text-gray-500 mb-2 uppercase tracking-wider font-medium">Modelos Activos</p>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-300">Random Forest</span>
-                  <span className="text-xs px-2 py-0.5 bg-green-500/10 text-green-400 rounded-full border border-green-500/20">Predicción</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-300">Isolation Forest</span>
-                  <span className="text-xs px-2 py-0.5 bg-red-500/10 text-red-400 rounded-full border border-red-500/20">Anomalías</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-300">Prophet IA</span>
-                  <span className="text-xs px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded-full border border-indigo-500/20">Forecast</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-300">XGBoost</span>
-                  <span className="text-xs px-2 py-0.5 bg-orange-500/10 text-orange-400 rounded-full border border-orange-500/20">Riesgo</span>
-                </div>
+        {/* Right Side Info Cards */}
+        <div className="lg:col-span-4 space-y-8">
+           <div className="glass-card rounded-[2.5rem] p-8 border-white/5 flex flex-col group hover-glow transition-all">
+              <div className="flex justify-between items-center mb-8">
+                 <h3 className="text-lg font-bold text-white tracking-tight">Zonas de Control</h3>
+                 <MoreVertical size={16} className="text-gray-600" />
               </div>
-            </div>
-
-            {/* Mensaje de la IA */}
-            <div className="p-4 bg-black/20 rounded-lg border border-white/5 relative">
-              <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 rounded-l-lg"></div>
-              <p className="text-indigo-200 text-sm leading-relaxed pl-2">
-                {metrics?.ai_prediction || "Cargando modelo preventivo..."}
-              </p>
-            </div>
-
-            {/* Métricas del modelo */}
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between items-center text-sm mb-1">
-                  <span className="text-gray-400">Precisión del modelo</span>
-                  <span className="text-green-400 font-medium">94.2%</span>
-                </div>
-                <div className="w-full bg-gray-800 rounded-full h-1.5">
-                  <div className="bg-green-500 h-1.5 rounded-full w-[94%] transition-all duration-1000"></div>
-                </div>
+              
+              <div className="space-y-6">
+                 <ZoneItem name="El Tambo" status="Optimizado" val={88} color="bg-emerald-500" />
+                 <ZoneItem name="Huancayo Centro" status="Carga Alta" val={92} color="bg-primary" />
+                 <ZoneItem name="Chilca" status="Puntos Críticos" val={42} color="bg-red-500" />
+                 <ZoneItem name="Pilcomayo" status="Estable" val={74} color="bg-sky-500" />
               </div>
 
-              <div>
-                <div className="flex justify-between items-center text-sm mb-1">
-                  <span className="text-gray-400">Tasa falsos positivos</span>
-                  <span className="text-sky-400 font-medium">&lt; 5%</span>
-                </div>
-                <div className="w-full bg-gray-800 rounded-full h-1.5">
-                  <div className="bg-sky-500 h-1.5 rounded-full w-[5%] transition-all duration-1000"></div>
-                </div>
+              <div className="mt-8 pt-8 border-t border-white/5">
+                 <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                       <Clock size={14} className="text-gray-600" />
+                       <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Update 0.2s</span>
+                    </div>
+                    <button className="text-[10px] font-black text-primary uppercase tracking-[0.2em] hover:text-white transition-colors">Ver Mapa Completo</button>
+                 </div>
               </div>
+           </div>
 
-              <div className="flex justify-between items-center text-sm pt-1">
-                <span className="text-gray-400">Latencia detección</span>
-                <span className="text-gray-200 font-medium font-mono">&lt; 5ms</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-4 flex flex-col space-y-2">
-            <Link href="/ai" className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors text-center block">
-              Probar Modelos Interactivamente
-            </Link>
-            <Link href="/alerts" className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-gray-300 rounded-lg text-sm font-medium transition-colors text-center block border border-white/10">
-              Ver Alertas Activas
-            </Link>
-          </div>
+           <div className="bg-gradient-to-tr from-primary/20 to-transparent p-8 rounded-[2.5rem] border border-primary/20 space-y-4">
+              <TrendingUp className="w-8 h-8 text-primary mb-2" />
+              <h4 className="text-white font-bold text-lg leading-tight">Optimización Automática</h4>
+              <p className="text-xs text-gray-500 font-medium leading-relaxed">El motor de IA ha reducido las pérdidas por fuga en un <span className="text-white font-bold">12.4%</span> en este sector durante el último periodo mensual.</p>
+           </div>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* Phase 2: Long Term Forecast Section */}
-      <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl p-6 shadow-sm">
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Activity className="w-5 h-5 text-indigo-400" />
-            Proyección de Demanda Hídrica — Próximos 7 días
-          </h3>
-          <p className="text-sm text-gray-400">Modelo Prophet entrenado con estacionalidad diaria y semanal del Río Mantaro.</p>
+function MetricCard({ label, value, trend, isUp, icon, color }: Metric) {
+  return (
+    <div className="glass-card rounded-[2.5rem] p-8 border-white/5 hover-glow transition-all group overflow-hidden relative">
+      <div className="absolute top-0 right-0 w-24 h-24 bg-white/[0.02] rounded-bl-[4rem] group-hover:bg-primary/5 transition-colors"></div>
+      
+      <div className="flex justify-between items-start mb-6">
+        <div className={`p-4 rounded-2xl bg-white/5 ${color} group-hover:scale-110 transition-transform`}>
+          {icon}
         </div>
-        <div className="h-[300px] w-full">
-          {forecastData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={forecastData}>
-                <defs>
-                  <linearGradient id="colorForecast" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis 
-                  dataKey="ds" 
-                  stroke="#475569" 
-                  fontSize={10} 
-                  tickLine={false} 
-                  axisLine={false}
-                  tickFormatter={(str, index) => {
-                    const date = new Date(str);
-                    return index % 24 === 0 ? date.toLocaleDateString("es-PE", { weekday: 'short' }) : "";
-                  }}
-                />
-                <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0d1526', borderColor: '#1e293b', borderRadius: '12px', fontSize: '12px' }}
-                  itemStyle={{ color: '#818cf8' }}
-                  labelFormatter={(label) => new Date(label).toLocaleString()}
-                />
-                <Area type="monotone" dataKey="yhat" name="Caudal Proyectado" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#colorForecast)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-              Generando proyección de 7 días...
-            </div>
-          )}
+        <div className={`flex items-center space-x-1 px-3 py-1.5 rounded-xl text-[10px] font-black ${isUp ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+          {isUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+          <span>{trend}</span>
         </div>
       </div>
+      
+      <div>
+        <h4 className="text-4xl font-black text-white tracking-tighter mb-1">{value}</h4>
+        <p className="text-[11px] font-bold text-gray-500 uppercase tracking-[0.25em]">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function ZoneItem({ name, status, val, color }: any) {
+  return (
+    <div className="space-y-3 cursor-pointer group/item">
+       <div className="flex justify-between items-end">
+          <div>
+             <p className="text-sm font-bold text-white group-hover/item:text-primary transition-colors">{name}</p>
+             <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mt-0.5">{status}</p>
+          </div>
+          <span className="text-[10px] font-black text-gray-500 tracking-widest">{val}%</span>
+       </div>
+       <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/[0.02]">
+          <div className={`h-full ${color} rounded-full transition-all duration-1000 group-hover/item:opacity-80`} style={{ width: `${val}%` }}></div>
+       </div>
     </div>
   );
 }
