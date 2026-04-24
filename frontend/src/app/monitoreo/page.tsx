@@ -14,17 +14,37 @@ export default function MonitoreoPage() {
   });
 
   // Simulación de telemetría en tiempo real
+  // Conexión real + Simulación de telemetría secundaria
   useEffect(() => {
+    const fetchRealCaudal = async () => {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/dashboard/metrics");
+        if (res.ok) {
+          const metrics = await res.json();
+          setData(prev => ({ ...prev, caudal: metrics.flow_rate_m3s }));
+        }
+      } catch (err) {
+        console.warn("Usando fallback de caudal");
+      }
+    };
+
     const interval = setInterval(() => {
       setData(prev => ({
+        ...prev,
         turbidez: Number((prev.turbidez + (Math.random() - 0.5) * 0.1).toFixed(2)),
         ph: Number((prev.ph + (Math.random() - 0.5) * 0.05).toFixed(2)),
         cloro: Number((prev.cloro + (Math.random() - 0.5) * 0.02).toFixed(2)),
         presion: Number((prev.presion + (Math.random() - 0.5) * 1.5).toFixed(1)),
-        caudal: Math.floor(prev.caudal + (Math.random() - 0.5) * 10),
+        // Caudal real de la API o simulación de ruido suave si falla
+        caudal: prev.caudal === 380 ? Math.floor(prev.caudal + (Math.random() - 0.5) * 10) : prev.caudal,
         temperatura: Number((prev.temperatura + (Math.random() - 0.5) * 0.2).toFixed(1))
       }));
+      // Fetch caudal real cada 10 iteraciones (20s)
+      if (Math.random() > 0.8) fetchRealCaudal();
     }, 2000);
+    
+    fetchRealCaudal(); // Fetch inicial
+
     return () => clearInterval(interval);
   }, []);
 

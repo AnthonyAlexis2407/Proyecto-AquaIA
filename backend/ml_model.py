@@ -1,8 +1,15 @@
-import pandas as pd
-import numpy as np
-from sklearn.ensemble import RandomForestRegressor, IsolationForest
 from datetime import datetime, timedelta
 import random
+import math
+
+try:
+    import pandas as pd
+    import numpy as np
+    from sklearn.ensemble import RandomForestRegressor, IsolationForest
+    CORE_ML_AVAILABLE = True
+except ImportError:
+    CORE_ML_AVAILABLE = False
+    print("[AquaIA] Advertencia Crítica: scikit-learn, pandas o numpy no instalados. Activando Modo Super-Simulado (Core).")
 
 # Phase 2 Imports (Moved to local imports to prevent boot hangs)
 PROPHET_AVAILABLE = True # Assume true, check inside
@@ -11,7 +18,10 @@ OR_TOOLS_AVAILABLE = True
 
 class WaterFlowPredictor:
     def __init__(self):
-        self.model = RandomForestRegressor(n_estimators=50, random_state=42)
+        if CORE_ML_AVAILABLE:
+            self.model = RandomForestRegressor(n_estimators=50, random_state=42)
+        else:
+            self.model = None
         self.is_trained = False
         
     def _generate_synthetic_data(self, records=1000):
@@ -55,6 +65,11 @@ class WaterFlowPredictor:
 
     def train_model(self):
         """Entrena el modelo en memoria utilizando datos sintéticos."""
+        if not CORE_ML_AVAILABLE:
+            self.is_trained = True
+            print("[AquaIA Model] Modo Super-Simulado activo: Random Forest omitido.")
+            return
+
         df = self._generate_synthetic_data(records=200) # Reducido para demo
         
         # Variables predictoras (X) y Objetivo (y)
@@ -70,6 +85,14 @@ class WaterFlowPredictor:
         if not self.is_trained:
             self.train_model()
             
+        if not CORE_ML_AVAILABLE:
+            # Predicción simulada basada en la hora
+            base_temp = 10 + 8 * math.sin(math.pi * (hour - 8) / 12)
+            flow = 40.0 + random.uniform(-2, 2)
+            if rain_prob > 30:
+                flow += 2.0
+            return round(flow, 2)
+
         # Crear Dataframe para la predicción para evitar warning
         input_data = pd.DataFrame([{
             'hour': hour,
@@ -82,8 +105,10 @@ class WaterFlowPredictor:
 
 class AnomalyDetector:
     def __init__(self):
-        # contamination asume un % de anomalías en los datos de entrenamiento
-        self.model = IsolationForest(contamination=0.05, random_state=42)
+        if CORE_ML_AVAILABLE:
+            self.model = IsolationForest(contamination=0.05, random_state=42)
+        else:
+            self.model = None
         self.is_trained = False
         
     def _generate_normal_data(self, records=1000):
@@ -98,6 +123,11 @@ class AnomalyDetector:
         
     def train_model(self):
         """Entrena el modelo de Isolation Forest con datos normales."""
+        if not CORE_ML_AVAILABLE:
+            self.is_trained = True
+            print("[AquaIA Model] Modo Super-Simulado activo: Isolation Forest omitido.")
+            return
+
         try:
             X_train = self._generate_normal_data(records=200) # Reducido para demo
             self.model.fit(X_train)
@@ -113,6 +143,10 @@ class AnomalyDetector:
             # En producción esto no debería pasar si se entrena al inicio
             return False 
             
+        if not CORE_ML_AVAILABLE:
+            # Simulación: caudal anómalo si se aleja mucho de 40
+            return bool(abs(current_flow - 40.0) > 12)
+
         try:
             # El modelo espera un array 2D
             prediction = self.model.predict([[current_flow]])
@@ -190,7 +224,7 @@ class DemandForecaster:
             return forecast
 
         try:
-            future = self.model.make_future_dataframe(periods=periods, freq='H')
+            future = self.model.make_future_dataframe(periods=periods, freq='h')
             forecast = self.model.predict(future)
             # Retornar solo los datos futuros
             result = forecast.tail(periods)[['ds', 'yhat']]

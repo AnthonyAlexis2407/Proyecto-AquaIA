@@ -1,11 +1,8 @@
-fastapi==0.110.0
-uvicorn==0.28.0
-scikit-learn==1.4.1.post1
-pandas==2.2.1
-numpy==1.26.4
-supabase==2.3.6
-python-dotenv==1.0.1
-prophet==1.1.5
-xgboost==2.0.3
-ortools==9.8.3296
-tensorflow==2.15.0
+fastapi
+uvicorn
+supabase
+python-dotenv
+# Core Data Science (Flexible para Python 3.14+)
+scikit-learn
+pandas
+numpy

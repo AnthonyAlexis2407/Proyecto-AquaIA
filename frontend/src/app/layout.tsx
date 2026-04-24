@@ -176,7 +176,8 @@ export default function RootLayout({
 function NavItem({ href, icon, label, active, badge }: { href: string; icon: React.ReactNode; label: string; active?: boolean; badge?: string }) {
   return (
     <Link 
-      href={href} 
+      href={href}
+      prefetch={true} 
       className={`
         flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-300 group
         ${active 

@@ -11,23 +11,51 @@ export default function OptimizationPage() {
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<any>(null);
 
-  const runVRP = () => {
+  const runVRP = async () => {
     setIsRunning(true);
     setResult(null);
-    // Simulación del algoritmo OR-Tools
-    setTimeout(() => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/v1/logistics/optimize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          locations: [
+            { id: "A", lat: -11.16, lon: -75.98 },
+            { id: "B", lat: -11.18, lon: -76.01 },
+            { id: "C", lat: -11.12, lon: -75.95 },
+            { id: "D", lat: -11.15, lon: -75.90 }
+          ]
+        })
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        setResult({
+          distancia: `${data.distance_km} km`,
+          tiempo: `${Math.floor(data.estimated_time_mins / 60)}h ${data.estimated_time_mins % 60}m`,
+          nodos: data.route_points.length - 1,
+          ahorro: "18.4%", // Calculado estático referencial
+          rutas: [
+            { id: "R-01", zona: "Circuito Norte", paradas: Math.ceil(data.route_points.length/2), estado: "Óptimo" },
+            { id: "R-02", zona: "Circuito Sur", paradas: Math.floor(data.route_points.length/2), estado: "Óptimo" }
+          ]
+        });
+      } else {
+        throw new Error("Backend devolvió error");
+      }
+    } catch (error) {
+      console.error(error);
+      // Fallback robusto en caso de error de red
       setResult({
-        distancia: "36.4 km",
-        tiempo: "1h 42min",
-        nodos: 5,
-        ahorro: "14%",
+        distancia: "36.4 km", tiempo: "1h 42min", nodos: 5, ahorro: "14%",
         rutas: [
-          { id: "R-01", zona: "El Tambo - Chilca", paradas: 3, estado: "Óptimo" },
-          { id: "R-02", zona: "Huancayo Centro", paradas: 2, estado: "Óptimo" }
+          { id: "R-01", zona: "El Tambo - Chilca (Fallback)", paradas: 3, estado: "Simulado" },
+          { id: "R-02", zona: "Huancayo Centro (Fallback)", paradas: 2, estado: "Simulado" }
         ]
       });
+    } finally {
       setIsRunning(false);
-    }, 3000);
+    }
   };
 
   return (

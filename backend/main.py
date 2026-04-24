@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import os
 import random
-import numpy as np
+import math
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 from ml_model import WaterFlowPredictor, AnomalyDetector, DemandForecaster, ZoneRiskScanner, LogisticsOptimizer
@@ -15,6 +15,13 @@ app = FastAPI(
 )
 
 # Configuración prioritaria de CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Permitir todos los orígenes para máxima portabilidad en dev
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ----------------------------------------------------
 # 1. Configuración de Modelos Pydantic (Validación)
@@ -128,7 +135,7 @@ def get_dashboard_metrics():
     anomalies = sum(1 for reading in sensor_readings if anomaly_detector.detect(reading))
     
     # Calcular caudal promedio
-    avg_flow = round(np.mean(sensor_readings), 1)
+    avg_flow = round(sum(sensor_readings) / len(sensor_readings) if active_sensors > 0 else 40.0, 1)
     
     # Determinar estado del sistema según la cantidad de anomalías
     if anomalies >= 10:
@@ -163,7 +170,7 @@ def get_flow_chart_data():
         hour = current_time.hour
         
         # Clima simulado para la región Junín
-        temperature = 10 + 8 * np.sin(np.pi * (hour - 8) / 12) + random.uniform(-1, 1)
+        temperature = 10 + 8 * math.sin(math.pi * (hour - 8) / 12) + random.uniform(-1, 1)
         rain_prob = max(0, min(100, random.uniform(-10, 40)))
         
         # Simular variación del flujo
