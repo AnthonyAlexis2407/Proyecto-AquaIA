@@ -1,37 +1,49 @@
 "use client";
 
 import { useState } from "react";
-import { Droplet, Mail, Lock, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Droplet, Mail, Lock, ChevronRight, CheckCircle2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { login } from "@/lib/api";
 
 export default function LoginPage() {
   const [role, setRole] = useState("Operador");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simular login y persistir sesión
-    setTimeout(() => {
+    setError("");
+    try {
+      const data = await login(email, password);
+      // Persist session marker for layout guard
       localStorage.setItem("aquaia_session", "true");
       router.push("/");
-    }, 1500);
+    } catch (err: any) {
+      setError(err.message || "Error de conexión con el servidor");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Quick-fill helpers for demo
+  const quickFill = (e: string, p: string, r: string) => {
+    setEmail(e);
+    setPassword(p);
+    setRole(r);
   };
 
   return (
     <div className="flex h-screen w-full bg-[#060b16] overflow-hidden">
-      {/* Left Side: Hero Section (Elegant Water) */}
+      {/* Left Side: Hero Section */}
       <div className="hidden lg:flex w-1/2 relative flex-col justify-between p-16 overflow-hidden bg-[#0d1425]">
-        {/* Animated Water Background (CSS Only) */}
         <div className="absolute inset-0 z-0">
           <div className="absolute top-[-20%] left-[-10%] w-[140%] h-[140%] bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.03)_0%,transparent_50%)] animate-pulse"></div>
           <div className="absolute top-[30%] right-[-20%] w-[100%] h-[100%] bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.03)_0%,transparent_50%)] animate-pulse delay-700"></div>
-          
-          {/* Subtle Grid Pattern */}
           <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
         </div>
 
@@ -52,12 +64,11 @@ export default function LoginPage() {
             Gestión hídrica <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
               inteligente
-            </span> para la región Junín
+            </span> para Palián
           </h2>
           <p className="text-lg text-gray-400 leading-relaxed font-light">
             Monitoreo en tiempo real, predicción de demanda y optimización logística mediante modelos avanzados de Machine Learning.
           </p>
-
           <div className="grid grid-cols-3 gap-6 pt-10">
             <StatCard label="8.7%" sub="MAPE predicción" />
             <StatCard label="94.2%" sub="Recall anomalías" />
@@ -75,16 +86,14 @@ export default function LoginPage() {
 
       {/* Right Side: Login Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-16 bg-[#060b16] relative">
-        {/* Decorative elements for mobile */}
         <div className="lg:hidden absolute top-10 left-10">
-            <div className="flex items-center space-x-2">
-                <Droplet className="w-6 h-6 text-primary" />
-                <span className="font-bold text-xl tracking-tight text-white">AquaIA</span>
-            </div>
+          <div className="flex items-center space-x-2">
+            <Droplet className="w-6 h-6 text-primary" />
+            <span className="font-bold text-xl tracking-tight text-white">AquaIA</span>
+          </div>
         </div>
 
         <div className="w-full max-w-md space-y-10 animate-in">
-          {/* Status Badge */}
           <div className="inline-flex items-center space-x-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-full">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
@@ -98,16 +107,28 @@ export default function LoginPage() {
             <p className="text-gray-500 font-medium">Accede a tu panel de gestión hídrica</p>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="flex items-center space-x-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl animate-in">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+              <span className="text-sm text-red-400 font-medium">{error}</span>
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-6">
             {/* Role Selection */}
             <div className="space-y-3">
               <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest pl-1">Rol de Acceso</p>
               <div className="grid grid-cols-3 gap-3">
-                {["Operador", "Analista", "Admin"].map((r) => (
+                {[
+                  { r: "Operador", e: "operador@aquaia.pe", p: "operador123" },
+                  { r: "Analista", e: "analista@aquaia.pe", p: "analista123" },
+                  { r: "Admin", e: "admin@aquaia.pe", p: "admin123" },
+                ].map(({ r, e, p }) => (
                   <button
                     key={r}
                     type="button"
-                    onClick={() => setRole(r)}
+                    onClick={() => quickFill(e, p, r)}
                     className={`
                       py-3 rounded-xl text-sm font-semibold transition-all duration-300 border
                       ${role === r 
@@ -121,7 +142,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Inputs */}
             <div className="space-y-4 pt-2">
               <div className="space-y-2">
                 <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest pl-1">Correo Electrónico</p>
@@ -134,7 +154,7 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="usuario@sedam.gob.pe"
+                    placeholder="usuario@aquaia.pe"
                     className="block w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
                   />
                 </div>
@@ -143,7 +163,6 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center px-1">
                   <p className="text-[11px] font-bold text-gray-500 uppercase tracking-widest">Contraseña</p>
-                  <Link href="#" className="text-[11px] font-bold text-primary hover:text-primary/80 transition-colors uppercase tracking-widest">¿Olvidaste tu contraseña?</Link>
                 </div>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -158,7 +177,7 @@ export default function LoginPage() {
                     className="block w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
                   />
                   <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
-                     <CheckCircle2 className={`w-5 h-5 transition-all ${password.length >= 8 ? 'text-primary scale-100' : 'text-gray-800 scale-90'}`} />
+                    <CheckCircle2 className={`w-5 h-5 transition-all ${password.length >= 5 ? 'text-primary scale-100' : 'text-gray-800 scale-90'}`} />
                   </div>
                 </div>
               </div>
@@ -183,9 +202,15 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="text-center text-sm text-gray-600">
-            ¿Problemas de acceso? <Link href="#" className="text-gray-400 hover:text-white font-semibold transition-colors">Contacta al administrador</Link>
-          </p>
+          {/* Quick access info */}
+          <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Demo — Cuentas disponibles</p>
+            <div className="space-y-1">
+              <p className="text-[11px] text-gray-400"><span className="text-primary font-bold">Admin:</span> admin@aquaia.pe / admin123</p>
+              <p className="text-[11px] text-gray-400"><span className="text-sky-400 font-bold">Analista:</span> analista@aquaia.pe / analista123</p>
+              <p className="text-[11px] text-gray-400"><span className="text-amber-400 font-bold">Operador:</span> operador@aquaia.pe / operador123</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

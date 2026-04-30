@@ -1,8 +1,13 @@
 fastapi
 uvicorn
-supabase
 python-dotenv
-# Core Data Science (Flexible para Python 3.14+)
+# Core Data Science
 scikit-learn
 pandas
 numpy
+# Auth & Security
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+# Reports (PMV2)
+openpyxl

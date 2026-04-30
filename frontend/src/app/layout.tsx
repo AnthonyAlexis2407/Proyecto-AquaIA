@@ -5,11 +5,12 @@ import "./globals.css";
 import { 
   Droplet, LayoutDashboard, Map as MapIcon, BrainCircuit, 
   ShieldAlert, Settings, Activity, Cpu, FileText, 
-  BarChart3, Zap, Bell, LogOut
+  Zap, Bell, LogOut, MapPin
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { getToken, getUser, removeToken } from "@/lib/api";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,14 +23,22 @@ export default function RootLayout({
   const router = useRouter();
   const [isAuth, setIsAuth] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [alertCount, setAlertCount] = useState(0);
 
   const isLoginPage = pathname === "/login";
 
   useEffect(() => {
-    // Simulación de persistencia de sesión "Premium"
-    const session = localStorage.getItem("aquaia_session");
-    if (session) {
+    const token = getToken();
+    const userData = getUser();
+    if (token && userData) {
       setIsAuth(true);
+      setUser(userData);
+      // Fetch alert count
+      fetch("http://127.0.0.1:8000/api/v1/alerts/count")
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data) setAlertCount(data.total); })
+        .catch(() => {});
     } else if (!isLoginPage) {
       router.push("/login");
     }
@@ -37,12 +46,12 @@ export default function RootLayout({
   }, [isLoginPage, router]);
 
   const handleLogout = () => {
+    removeToken();
     localStorage.removeItem("aquaia_session");
     setIsAuth(false);
     router.push("/login");
   };
 
-  // Pantalla de carga profesional
   if (loading) {
     return (
       <html lang="es" className="dark h-full">
@@ -58,7 +67,6 @@ export default function RootLayout({
     );
   }
 
-  // Layout para la página de Login (Sin Sidebar/Header)
   if (isLoginPage) {
     return (
       <html lang="es" className="dark h-full antialiased">
@@ -69,10 +77,14 @@ export default function RootLayout({
     );
   }
 
+  const userInitials = user?.full_name
+    ? user.full_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : "??";
+
   return (
     <html lang="es" className="dark h-full antialiased">
       <body className={`${inter.className} h-screen bg-[var(--color-background)] text-[var(--color-foreground)] flex overflow-hidden`}>
-        {/* Sidebar - Fijo a la izquierda */}
+        {/* Sidebar */}
         <aside className="w-72 bg-[#0d1425] border-r border-white/5 flex flex-col z-20 shadow-2xl flex-shrink-0">
           <div className="h-20 flex items-center px-8 border-b border-white/5">
             <div className="bg-primary/20 p-2 rounded-xl mr-3">
@@ -80,36 +92,35 @@ export default function RootLayout({
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-white">AquaIA</h1>
-              <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-medium leading-none mt-1">Gestión Hídrica</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-medium leading-none mt-1">Gestión Hídrica v3.0</p>
             </div>
           </div>
           
           <nav className="flex-1 px-4 py-8 space-y-8 overflow-y-auto custom-scrollbar">
-            {/* Categoría: PRINCIPAL */}
             <div>
               <p className="px-4 text-[10px] font-bold text-gray-500 uppercase tracking-[0.15em] mb-4">Principal</p>
               <div className="space-y-1">
                 <NavItem href="/" icon={<LayoutDashboard size={18} />} label="Dashboard" active={pathname === "/"} />
                 <NavItem href="/monitoreo" icon={<Activity size={18} />} label="Monitoreo" active={pathname === "/monitoreo"} />
-                <NavItem href="/alerts" icon={<Bell size={18} />} label="Alertas" active={pathname === "/alerts"} badge="3" />
+                <NavItem href="/alerts" icon={<Bell size={18} />} label="Alertas" active={pathname === "/alerts"} badge={alertCount > 0 ? String(alertCount) : undefined} />
               </div>
             </div>
 
-            {/* Categoría: ANÁLISIS */}
             <div>
               <p className="px-4 text-[10px] font-bold text-gray-500 uppercase tracking-[0.15em] mb-4">Análisis</p>
               <div className="space-y-1">
                 <NavItem href="/ai" icon={<BrainCircuit size={18} />} label="Predicción IA" active={pathname === "/ai"} />
                 <NavItem href="/optimization" icon={<Zap size={18} />} label="Optimización" active={pathname === "/optimization"} />
+                <NavItem href="/simulation" icon={<Activity size={18} />} label="Simulación" active={pathname === "/simulation"} />
                 <NavItem href="/map" icon={<MapIcon size={18} />} label="Mapa Hídrico" active={pathname === "/map"} />
               </div>
             </div>
 
-            {/* Categoría: SISTEMA */}
             <div>
               <p className="px-4 text-[10px] font-bold text-gray-500 uppercase tracking-[0.15em] mb-4">Sistema</p>
               <div className="space-y-1">
                 <NavItem href="/sensors" icon={<Cpu size={18} />} label="Sensores IoT" active={pathname === "/sensors"} />
+                <NavItem href="/zones" icon={<MapPin size={18} />} label="Zonas" active={pathname === "/zones"} />
                 <NavItem href="/reports" icon={<FileText size={18} />} label="Reportes" active={pathname === "/reports"} />
                 <NavItem href="/settings" icon={<Settings size={18} />} label="Configuración" active={pathname === "/settings"} />
               </div>
@@ -119,11 +130,11 @@ export default function RootLayout({
           <div className="p-4 border-t border-white/5">
             <div className="bg-white/5 rounded-xl p-4 flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-accent flex items-center justify-center text-white font-bold shadow-lg">
-                JD
+                {userInitials}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">Juan Delgado</p>
-                <p className="text-xs text-gray-500 truncate">Administrador</p>
+                <p className="text-sm font-semibold text-white truncate">{user?.full_name || "Usuario"}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.role || "Sin rol"}</p>
               </div>
               <button 
                 onClick={handleLogout}
@@ -136,27 +147,24 @@ export default function RootLayout({
           </div>
         </aside>
 
-        {/* Main Content Area - Scrollable */}
+        {/* Main Content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-          {/* Top Header - Fijo arriba del contenido */}
           <header className="h-20 bg-[var(--color-background)]/80 backdrop-blur-md border-b border-white/5 flex items-center justify-between px-10 z-10 flex-shrink-0">
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Región Junín / Central</span>
-              <h2 className="text-sm font-semibold text-white mt-1">Panel de Control General</h2>
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Palián, Huancayo / Central</span>
+              <h2 className="text-sm font-semibold text-white mt-1">Panel de Control — AquaIA v3.0</h2>
             </div>
             <div className="flex items-center space-x-6">
                 <div className="flex items-center space-x-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full">
                   <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
                   <span className="text-[11px] font-bold text-green-400 uppercase tracking-wider">Sistema Conectado</span>
                 </div>
-                <button className="relative p-2 text-gray-400 hover:text-white transition-colors">
-                  <Bell size={20} />
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#060b16]"></span>
-                </button>
+                <div className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-full">
+                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{user?.role}</span>
+                </div>
             </div>
           </header>
           
-          {/* Page Content - UNICO ELEMENTO CON SCROLL */}
           <main className="flex-1 overflow-x-hidden overflow-y-auto p-10 bg-[#060b16] custom-scrollbar">
             {children}
           </main>
